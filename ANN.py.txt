@@ -1,0 +1,251 @@
+import pandas as pd
+from sklearn.utils import shuffle
+import numpy as np
+from random import shuffle
+from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from math import *
+import matplotlib.pyplot as plt
+%matplotlib inline
+from sklearn.metrics import mean_squared_error
+import sys
+
+
+neurons = 4
+epochs = 4000
+regularisation_parameter= 0.2
+learning_rate=0.4
+momentum=0.1
+
+def load_file():
+    df = pd.read_csv("M:\\nntrainingdata_copywoheader.csv", header=None)
+    df.columns = ['X_1', 'X_2', 'Y_1', 'Y_2']
+    return df
+
+def remove_duplicates(df):
+
+    df = df.drop_duplicates(keep=False, inplace=True)
+    return df
+
+def get_dimensions(df):
+    print(df.head())
+    print(df.shape)
+    print(df.describe())
+
+def fix_outliers(df):
+    df.loc[df['X_1'] > 1500, 'X_1'] = 1500 
+    # df.loc[df['X_2'] > 4500, 'X_2'] = 4500
+    return df
+
+def normalise(df):
+    df_min = df.min()
+    df_max = df.max()
+    df_std = df.std()
+    ##Applying normalisation in the data framenormalized_df= (df - df.min()) / (df.max() - df.min())
+    return normalized_df,df_min,df_max,df_std
+
+def Split_train_test_cross_validation(df):
+    # Seperating reposne and Predictor varibales
+    X = df.iloc[:,[0,1]]
+    Y = df.iloc[:,[2,3]]
+    #Splitting data into train , split and validation
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.15, rand
+    om_state=1)
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=
+    0.30, random_state=1)print(X_train.shape , y_train.shape)
+    print(X_val.shape , y_val.shape)
+    print(X_test.shape, y_test)
+    #Applying Transpose to pass it to neural network framework
+    X_train = np.array(X_train).T
+    y_train = np.array(y_train).T
+    X_val = np.array(X_val).T
+    y_val = np.array(y_val).T
+    X_test = np.array(X_test).T
+    y_test = np.array(y_test).T
+    return X_train,y_train,X_val,y_val,X_test,y_test
+
+def updated_file_dimension(neurons,X_train,y_train):
+    x_Shape = X_train.shape[0]
+    y_shape = y_train.shape[0]
+    neurons = neurons
+    print("Input", x_Shape)
+    print("Neurons", neurons)
+    print("Output", y_shape)
+    
+def sigmoid(x):
+    return 1/(1+ np.exp(-x * regularisation_parameter))
+
+def sigmoid_derivative(x):
+    return sigmoid(x)*sigmoid(1-(x))
+
+def test_predict(weight_dict, X_test): 
+    wh, bh = weight_dict['weights_hidden'], weight_dict['bias_hidden']
+    wo, bo = weight_dict['weights_output'], weight_dict['bias_output']
+
+    zh = np.dot(wh, X_test) +bh
+    ah = sigmoid(zh) #activation layer
+
+    zo = np.dot(wo, ah) + bo
+    ao_test = sigmoid(zo) 
+    #rmse_test = np.mean(np.square(y_test - ao_test))
+    return ao_test
+
+def initialise_Weights():
+
+    #Set seed to repeat the same values
+    np.random.seed(144)
+    weights_hidden = np.random.rand(4,2)
+    bias_hidden = np.zeros((4,1))
+
+    weights_output = np.random.rand(2,4)
+    bias_output = np.zeros((2,1))
+
+    #gradient momentum initilizations
+    dw1_last = np.zeros((4,2))
+    dw2_last = np.zeros((2,4))
+
+    weight_dict = { 'weights_hidden': weights_hidden, 'bias_hidden': bias_hidden, 'weights_output': weights_output, 'bias_output': bias_output, "dw1_last":dw1_last, "dw2_last": dw2_last}
+
+    return weights_hidden,bias_hidden,weights_output,bias_output,dw1_last,dw2_last,weight_dict
+
+
+def forward_backward(X_train, y_train,X_val,y_val,weight_dict):
+
+    ##Forward Propogation Training
+    wh, bh = weight_dict['weights_hidden'], weight_dict['bias_hidden']
+    wo, bo = weight_dict['weights_output'], weight_dict['bias_output']
+    dw1_last, dw2_last = weight_dict['dw1_last'], weight_dict['dw2_last']
+
+    zh = np.dot(wh, X_train) + bh
+    ah = sigmoid(zh) #activation layer
+    zo = np.dot(wo, ah) + bo
+    ao = sigmoid(zo)
+
+    error = y_train - ao
+    rmse = np.mean(np.square(y_train - ao))
+
+    ##Backward Propogation
+    gradient_output = regularisation_parameter * ( error * sigmoid_derivative(zo))
+    gradient_hidden = regularisation_parameter * np.dot(wo.T, gradient_output) * sigmoid_derivative(zh)
+
+    delta_w1 = np.dot(gradient_hidden, X_train.T)
+    delat_w2 = np.dot(gradient_output, ah.T)
+    delta_b1 = np.sum(gradient_hidden, axis=1, keepdims=True)
+    delta_b2 = np.sum(gradient_output, axis=1, keepdims=True)
+    # update the weights with the derivative (slope) of the loss function
+    wh += learning_rate*delta_w1 + momentum * dw1_last
+    wo += learning_rate*delat_w2 + momentum * dw2_last
+    bh += learning_rate*delta_b1
+    bo += learning_rate*delta_b2
+
+    weight_dict = { 'weights_hidden': wh, 'bias_hidden': bh, 'weights_output': wo, 'bias_output': bo, "dw1_last":dw1_last, "dw2_last": dw2_last}
+
+    return rmse,weight_dict
+
+
+def Validation_Data(weight_dict, X_val, y_val):
+
+    wh, bh = weight_dict['weights_hidden'], weight_dict['bias_hidden']
+    wo, bo = weight_dict['weights_output'], weight_dict['bias_output'] 
+    dw1_last, dw2_last = weight_dict['dw1_last'], weight_dict['dw2_last']
+
+    zh = np.dot(wh, X_val) + bh
+    ah = sigmoid(zh)
+    zo = np.dot(wo, ah) + bo
+    ao_val = sigmoid(zo)
+
+    #rmse_cv = sqrt(mean_squared_error(cv_a2, y_cv))
+    rmse_cv = np.mean(np.square(y_val - ao_val))
+    return rmse_cv
+
+df = load_file()
+remove_duplicates(df)
+#get_dimensions(df)
+fix_outliers(df)
+
+df_n,df_min,df_max,df_std = normalise(df)
+
+X_train,y_train,X_val,y_val,X_test,y_test = Split_train_test_cross_validation(df_n)
+
+## Initialise Weights:¶
+## We will initialise the weights with zerosrandom numbers and bias with zeros
+
+#print(X_train.shape , y_train.shape)
+#print(X_val.shape , y_val.shape)
+
+#print(x_train.head())
+#print(y_train.head())
+#Applying Transpose to pass it to neural network framework
+#X_train = np.array(X_train).T
+#y_train = np.array(y_train).T
+
+updated_file_dimension(neurons,X_train,y_train)
+#Input 2
+#Neurons 4
+#Output 2
+
+weights_hidden,bias_hidden,weights_output,bias_output,dw1_last,dw2_last,weight_dict = initialise_Weights()
+
+
+rmse_trainingloss = []
+
+rmse_validationloss = []
+
+test_loss = []
+for i in range(1,epochs):
+
+
+    rmse,weight_dict = forward_backward(X_train, y_train,X_val,y_val,weight_dict)
+    rmse_trainingloss.append(rmse)
+    rmse_validation = Validation_Data(weight_dict, X_val, y_val)
+    rmse_test = Validation_Data(weight_dict, X_test, y_test)
+    rmse_validationloss.append(rmse_validation)
+    test_loss.append(rmse_test)
+    if i % 200 == 0:
+        print("Epoch %i:\n Training RMSEloss = %f Validation data RMSE-loss = %f" %(i,rmse, rmse_validation))
+
+#y_predicted.head()
+y_predicted =test_predict(weight_dict, X_test)
+
+y_predicted = pd.DataFrame(y_predicted.T,columns=['Y_1', 'Y_2'])
+
+
+
+y_predicted['Y_1'] = df['Y_1'].min() + y_predicted['Y_1']*(df['Y_1'].max() - df['Y_1'].min())
+
+y_predicted['Y_2'] = df['Y_2'].min() + y_predicted['Y_2']*(df['Y_2'].max() - df['Y_2'].min())
+
+
+y_val = pd.DataFrame(y_val.T,columns=['Actual_Y_1', 'ACtual_Y_2'])
+
+
+y_val['Actual_Y_1'] = df['Y_1'].min() + y_val['Actual_Y_1']*(df['Y_1'].max() - df['Y_1'].min())
+
+y_val['ACtual_Y_2'] = df['Y_2'].min() + y_val['ACtual_Y_2']*(df['Y_2'].max() - df['Y_2'].min())
+
+y_val.reset_index()
+
+y_predicted.reset_index()
+
+#compare = pd.concat([y_val, y_predicted], axis=1, sort=False)
+
+compare = pd.concat([y_val, y_predicted], axis=1)
+
+plt.plot(rmse_trainingloss)
+
+plt.plot(rmse_validationloss)
+
+plt.plot(test_loss)
+
+plt.title('model loss')
+
+plt.ylabel('loss')
+
+plt.xlabel('epoch')
+
+plt.legend(['train', 'cv','test'], loc='upper left')
+
+plt.xlim(0, 1200)
+
+plt.show()
+savefig('foo.png')
