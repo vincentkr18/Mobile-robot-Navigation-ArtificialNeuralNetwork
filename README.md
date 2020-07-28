@@ -13,7 +13,7 @@ development of techniques for autonomous mobile robot operation constitutes one 
 trends in the current research and practice in modern robotics
 
 ## AIM AND OBJECTIVE:
-The comprehensive aim of this coursework is to inspect the application of deep learning approaches
+The comprehensive aim of this project  is to inspect the application of deep learning approaches
 to navigate mobile robots. In this report, a simple artificial neural network have been used to solve
 mobile robots navigation challenges. The aim of autonomous mobile robots is to navigate and move
 across physical objects without human intervention in real-world environments. The challenge is to
